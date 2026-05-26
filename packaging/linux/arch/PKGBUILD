@@ -1,0 +1,35 @@
+# Maintainer: Vantage Mail Developer <dev@example.com>
+pkgname=vantage-mail
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Outlook-inspired email client with Exchange, SMTP, and IMAP integration"
+arch=('any')
+url="https://github.com/yourusername/vantage-mail"
+license=('Proprietary')
+depends=('python' 'python-pyqt6' 'python-pyqt6-webengine' 'python-msal' 'python-requests' 'python-icalendar' 'python-imapclient')
+source=("${pkgname}-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+    # Directory setup
+    mkdir -p "${pkgdir}/usr/bin"
+    mkdir -p "${pkgdir}/usr/share/vantage-mail"
+    mkdir -p "${pkgdir}/usr/share/applications"
+    mkdir -p "${pkgdir}/usr/share/pixmaps"
+
+    # Copy files
+    cp -r "${srcdir}/${pkgname}-${pkgver}/src" "${pkgdir}/usr/share/vantage-mail/"
+    cp -r "${srcdir}/${pkgname}-${pkgver}/icons_Vantage Mail" "${pkgdir}/usr/share/vantage-mail/"
+
+    # Create wrapper script
+    cat << 'EOF' > "${pkgdir}/usr/bin/vantage-mail"
+#!/bin/bash
+export PYTHONPATH="/usr/share/vantage-mail/src:$PYTHONPATH"
+exec python3 /usr/share/vantage-mail/src/main.py "$@"
+EOF
+    chmod +x "${pkgdir}/usr/bin/vantage-mail"
+
+    # Copy desktop launcher and icon
+    cp "${srcdir}/${pkgname}-${pkgver}/packaging/linux/vantage-mail.desktop" "${pkgdir}/usr/share/applications/"
+    cp "${srcdir}/${pkgname}-${pkgver}/icons_Vantage Mail/Vantage trans_Logo.png" "${pkgdir}/usr/share/pixmaps/vantage-mail.png"
+}

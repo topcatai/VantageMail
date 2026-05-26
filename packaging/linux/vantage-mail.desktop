@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Vantage Mail
+Comment=Outlook-inspired email client with Exchange integration
+Exec=vantage-mail
+Icon=vantage-mail
+Categories=Office;Network;Email;
+Terminal=false
+StartupNotify=true
