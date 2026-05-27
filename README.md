@@ -11,7 +11,7 @@ Vantage Mail is a premium, high-performance desktop email client built using **P
 
 ## 🌟 Key Features
 
-* **Universal Account Support**: IMAP/SMTP (Hostinger, Yahoo, iCloud, Zoho, Fastmail, ProtonMail, Generic cPanel) along with pre-designed hooks for Google Gmail API and Microsoft Graph API.
+* **Universal Account Support**: IMAP/SMTP (Hostinger, Yahoo, iCloud, Zoho, Fastmail, ProtonMail, Generic cPanel) along with pre-designed hooks for Google Gmail API and Microsoft Graph API (Google and Microsoft enablement coming soon).
 * **Smart Account Wizard**: Automatically detects server settings (IMAP/SMTP hosts and ports) based on the user's email domain.
 * **SQLite Offline Cache & Sync**: Downloads and merges mailbox structure and messages locally. Caches are loaded progressively to keep the UI immediate.
 * **Collapsible Grouped FTS5 Search**: An independent search window allows searching across multiple selected accounts. Results are indexed instantly using SQLite's **FTS5 (Full-Text Search)** virtual table and grouped into "Matches in Subject" and "Matches in Body" collapsible root tree nodes.
