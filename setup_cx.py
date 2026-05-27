@@ -84,8 +84,7 @@ executables = [
     Executable(
         script="src/main.py",
         base=base,
-        target_name="VantageMail.exe",
-        icon="icons_Vantage Mail/app_icon.ico"
+        target_name="VantageMail.exe"
     )
 ]
 
