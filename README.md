@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-red.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 
-Vantage Mail is a premium, high-performance desktop email client built using **Python 3.13** and **PyQt6**. It features a modern three-pane layout inspired by professional productivity applications, absolute offline caching, and instant SQLite FTS5-based search query speeds.
+Vantage Mail is a basic desktop email client built using **Python 3.13** and **PyQt6**. This initial version provides a robust foundation—featuring a three-pane layout, local offline caching, and fast SQLite FTS5 search speeds—laying the groundwork to evolve into a full-featured productivity suite.
 
 ---
 
