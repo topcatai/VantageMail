@@ -46,16 +46,26 @@ graph TD
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### 💻 End Users (Standalone Installation)
 
-Ensure you have Python 3.13+ installed on your system.
+Vantage Mail is packaged as a standalone application. **No dependencies (including Python) are required to run the installer.**
 
-### Installation
+* **Windows**: Download and run the [vantage-mail-1.0.0-win64.msi](https://github.com/topcatai/VantageMail/releases/download/v1.0.0/vantage-mail-1.0.0-win64.msi) installer.
+
+---
+
+### 🛠️ Developers (Running & Building from Source)
+
+#### Prerequisites
+
+Ensure you have **Python 3.13+** and **Git** installed on your system.
+
+#### Installation & Setup
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/vantage-mail.git
-   cd vantage-mail
+   git clone https://github.com/topcatai/VantageMail.git
+   cd VantageMail
    ```
 
 2. Setup virtual environment:
@@ -67,7 +77,7 @@ Ensure you have Python 3.13+ installed on your system.
    source venv/bin/activate
    ```
 
-3. Install in editable development mode:
+3. Install dependencies in editable development mode:
    ```bash
    pip install -e .[dev]
    ```
