@@ -3,7 +3,21 @@ import sqlite3, json
 from typing import Any, Dict, List, Optional
 
 class Database:
-    def __init__(self, db_path: str = 'outlook_client.db'):
+    def __init__(self, db_path: Optional[str] = None):
+        if db_path is None:
+            import os, platform
+            if platform.system() == "Windows":
+                base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or os.path.expanduser("~")
+                user_dir = os.path.join(base, "VantageMail")
+            elif platform.system() == "Darwin":
+                user_dir = os.path.expanduser("~/Library/Application Support/VantageMail")
+            else:
+                user_dir = os.path.expanduser("~/.local/share/vantage-mail")
+            
+            if not os.path.exists(user_dir):
+                os.makedirs(user_dir)
+            db_path = os.path.join(user_dir, 'outlook_client.db')
+            
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.execute("PRAGMA journal_mode=WAL;")
         self.fts_available = False

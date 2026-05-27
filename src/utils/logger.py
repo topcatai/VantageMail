@@ -4,9 +4,18 @@ import sys
 import logging
 from logging.handlers import TimedRotatingFileHandler
 
-# Project root directory
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-LOG_DIR = os.path.join(ROOT_DIR, "logs")
+def get_user_data_dir() -> str:
+    import platform
+    if platform.system() == "Windows":
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or os.path.expanduser("~")
+        path = os.path.join(base, "VantageMail")
+    elif platform.system() == "Darwin":
+        path = os.path.expanduser("~/Library/Application Support/VantageMail")
+    else:
+        path = os.path.expanduser("~/.local/share/vantage-mail")
+    return os.path.abspath(path)
+
+LOG_DIR = os.path.join(get_user_data_dir(), "logs")
 
 # Ensure the logs directory exists
 if not os.path.exists(LOG_DIR):
