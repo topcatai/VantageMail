@@ -166,6 +166,7 @@ QStatusBar {
 class MainWindowWorker(QObject):
     finished = pyqtSignal(object)
     error    = pyqtSignal(str)
+    progress = pyqtSignal(object)
 
     def __init__(self, fn, *args, **kwargs):
         super().__init__()
@@ -175,7 +176,20 @@ class MainWindowWorker(QObject):
 
     def run(self):
         try:
-            self.finished.emit(self._fn(*self._args, **self._kwargs))
+            has_progress = False
+            try:
+                import inspect
+                sig = inspect.signature(self._fn)
+                if 'progress_callback' in sig.parameters:
+                    has_progress = True
+            except Exception:
+                pass
+
+            if has_progress:
+                res = self._fn(*self._args, progress_callback=lambda data: self.progress.emit(data), **self._kwargs)
+            else:
+                res = self._fn(*self._args, **self._kwargs)
+            self.finished.emit(res)
         except Exception as e:
             from utils.logger import log_error
             log_error(f"Worker thread error running {self._fn.__name__ if hasattr(self._fn, '__name__') else str(self._fn)}: {e}", exc_info=True)
@@ -638,6 +652,7 @@ class MainWindow(QMainWindow):
         self._stop_read_timer()
         term = self.search_bar.text().strip()
         
+        self._prune_open_windows()
         # Check if an existing SearchWindow is already open
         from ui.widgets.search_window import SearchWindow
         existing_search = None
@@ -659,6 +674,7 @@ class MainWindow(QMainWindow):
                 return
             window = SearchWindow(self.account_manager, self, initial_query=term)
             self._open_windows.append(window)
+            window.destroyed.connect(lambda: self._safe_remove_window(window))
             window.show()
 
     def _sync_folder_background(self, acc_email, folder_id):
@@ -672,24 +688,34 @@ class MainWindow(QMainWindow):
         self._sync_in_flight.add(sync_key)
         db = self.account_manager._db
         provider = self.account_manager.get_active_provider()
-        def sync_task():
-            return sync_folder_messages(provider, db, acc_email, folder_id)
+        
+        def sync_task(progress_callback=None):
+            wrapped_cb = None
+            if progress_callback:
+                wrapped_cb = lambda msgs: progress_callback((acc_email, folder_id, msgs))
+            res = sync_folder_messages(provider, db, acc_email, folder_id, progress_callback=wrapped_cb)
+            return (acc_email, folder_id, res)
 
         thread, worker = self._run_in_thread(
             sync_task,
             self._on_messages_loaded
         )
+        worker.progress.connect(self._on_sync_progress)
         thread.finished.connect(lambda: self._sync_in_flight.discard(sync_key))
 
-    def _on_messages_loaded(self, messages):
-        self._populate_message_table(messages)
-        self.statusBar().showMessage(f"Loaded {len(messages)} messages")
-        if self._current_folder_id:
-            self._refresh_folder_badge(self._current_folder_id)
+    def _on_sync_progress(self, data):
+        acc_email, folder_id, messages = data
+        if self._current_folder_id == folder_id and self._current_account_email == acc_email:
+            self._populate_message_table(messages)
+            self.statusBar().showMessage(f"Syncing folder: {folder_id} — {len(messages)} messages...")
 
-        acc_email = self._current_account_email or self.account_manager._active_email
-        folder_id = self._current_folder_id
+    def _on_messages_loaded(self, data):
+        acc_email, folder_id, messages = data
+        if self._current_folder_id == folder_id and self._current_account_email == acc_email:
+            self._populate_message_table(messages)
+            self.statusBar().showMessage(f"Loaded {len(messages)} messages")
         if folder_id:
+            self._refresh_folder_badge(folder_id, acc_email)
             count_key = (acc_email, folder_id)
             new_count = len(messages)
             prev_count = self._folder_message_counts.get(count_key)
@@ -995,8 +1021,27 @@ class MainWindow(QMainWindow):
         self._current_account_email = email
         self._load_folders()
 
+    def _prune_open_windows(self):
+        alive = []
+        for w in self._open_windows:
+            try:
+                # If the C++ object was deleted, this will raise RuntimeError
+                if w.isVisible():
+                    alive.append(w)
+            except RuntimeError:
+                pass
+        self._open_windows = alive
+
+    def _safe_remove_window(self, window):
+        self._prune_open_windows()
+        try:
+            if window in self._open_windows:
+                self._open_windows.remove(window)
+        except RuntimeError:
+            pass
+
     def _can_open_new_window(self) -> bool:
-        self._open_windows = [w for w in self._open_windows if w.isVisible()]
+        self._prune_open_windows()
         if len(self._open_windows) >= 10:
             reply = QMessageBox.warning(
                 self,
@@ -1070,7 +1115,7 @@ class MainWindow(QMainWindow):
             )
             self._open_windows.append(composer)
             composer.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-            composer.destroyed.connect(lambda: self._open_windows.remove(composer) if composer in self._open_windows else None)
+            composer.destroyed.connect(lambda: self._safe_remove_window(composer))
             composer.finished.connect(self._on_composer_finished)
             composer.show()
         else:
@@ -1078,7 +1123,7 @@ class MainWindow(QMainWindow):
             viewer = EmailViewerWidget(email_data, provider, parent=self)
             self._open_windows.append(viewer)
             viewer.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-            viewer.destroyed.connect(lambda: self._open_windows.remove(viewer) if viewer in self._open_windows else None)
+            viewer.destroyed.connect(lambda: self._safe_remove_window(viewer))
             viewer.show()
 
     def _compose_new(self):
@@ -1088,7 +1133,7 @@ class MainWindow(QMainWindow):
         composer = EmailComposerWidget(provider, parent=self, account_manager=self.account_manager, mode='new')
         self._open_windows.append(composer)
         composer.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        composer.destroyed.connect(lambda: self._open_windows.remove(composer) if composer in self._open_windows else None)
+        composer.destroyed.connect(lambda: self._safe_remove_window(composer))
         composer.finished.connect(self._on_composer_finished)
         composer.show()
 
@@ -1135,7 +1180,7 @@ class MainWindow(QMainWindow):
         )
         self._open_windows.append(composer)
         composer.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        composer.destroyed.connect(lambda: self._open_windows.remove(composer) if composer in self._open_windows else None)
+        composer.destroyed.connect(lambda: self._safe_remove_window(composer))
         composer.finished.connect(self._on_composer_finished)
         composer.save_draft(force=True)
         composer.show()
@@ -1196,7 +1241,7 @@ class MainWindow(QMainWindow):
         )
         self._open_windows.append(composer)
         composer.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        composer.destroyed.connect(lambda: self._open_windows.remove(composer) if composer in self._open_windows else None)
+        composer.destroyed.connect(lambda: self._safe_remove_window(composer))
         composer.finished.connect(self._on_composer_finished)
         composer.save_draft(force=True)
         composer.show()
@@ -1277,7 +1322,7 @@ class MainWindow(QMainWindow):
         )
         self._open_windows.append(composer)
         composer.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        composer.destroyed.connect(lambda: self._open_windows.remove(composer) if composer in self._open_windows else None)
+        composer.destroyed.connect(lambda: self._safe_remove_window(composer))
         composer.finished.connect(self._on_composer_finished)
         composer.save_draft(force=True)
         composer.show()

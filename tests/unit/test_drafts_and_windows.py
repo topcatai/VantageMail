@@ -130,5 +130,52 @@ def test_keypress_delete_and_close():
     # Assert delete was called
     window._delete_selected.assert_called_once()
 
+def test_window_tracker_pruning():
+    from unittest.mock import MagicMock
+    from ui.main_window import MainWindow
+    
+    # We will instantiate a mock MainWindow instance
+    window = MagicMock(spec=MainWindow)
+    window._open_windows = []
+    
+    # 1. Valid visible window
+    w_visible = MagicMock()
+    w_visible.isVisible.return_value = True
+    
+    # 2. Valid invisible window (e.g. hidden)
+    w_hidden = MagicMock()
+    w_hidden.isVisible.return_value = False
+    
+    # 3. Destroyed window (raising RuntimeError)
+    w_destroyed = MagicMock()
+    w_destroyed.isVisible.side_effect = RuntimeError("wrapped C/C++ object of type SearchWindow has been deleted")
+    
+    window._open_windows = [w_visible, w_hidden, w_destroyed]
+    
+    # Call the actual pruning code on the mock object
+    MainWindow._prune_open_windows(window)
+    
+    # Verify that:
+    # - w_visible is kept because it's visible (isVisible() returns True)
+    # - w_hidden is NOT kept because isVisible() returns False
+    # - w_destroyed is pruned because it raised RuntimeError
+    assert window._open_windows == [w_visible]
+    
+    # Let's test safe removal as well
+    # Reset
+    window._open_windows = [w_visible, w_destroyed]
+    
+    # Map mock method to the real one so _safe_remove_window can call it
+    window._prune_open_windows = lambda: MainWindow._prune_open_windows(window)
+    
+    # Call safe removal of w_visible
+    MainWindow._safe_remove_window(window, w_visible)
+    assert window._open_windows == [] # w_destroyed is pruned, w_visible is removed
+    
+    # Call safe removal of already destroyed window (should prune and do nothing else)
+    window._open_windows = [w_destroyed]
+    MainWindow._safe_remove_window(window, w_destroyed)
+    assert window._open_windows == []
+
 
 

@@ -71,7 +71,7 @@ bdist_msi_options = {
     "upgrade_code": "{8A5D6B2C-7C4E-4A9B-9B2D-2F3D4E5F6A7B}",
     "add_to_path": False,
     "initial_target_dir": "[ProgramFilesFolder]\\VantageMail",
-    "install_icon": None,
+    "install_icon": "icons_Vantage Mail/app_icon.ico",
     "all_users": True,
     "data": msi_data
 }
@@ -84,7 +84,8 @@ executables = [
     Executable(
         script="src/main.py",
         base=base,
-        target_name="VantageMail.exe"
+        target_name="VantageMail.exe",
+        icon="icons_Vantage Mail/app_icon.ico"
     )
 ]
 

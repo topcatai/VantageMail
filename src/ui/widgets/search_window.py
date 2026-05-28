@@ -266,5 +266,7 @@ class SearchWindow(QWidget):
         
         # Append to main_window's open windows so it isn't garbage collected
         if self.main_window:
+            viewer.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
             self.main_window._open_windows.append(viewer)
+            viewer.destroyed.connect(lambda: self.main_window._safe_remove_window(viewer))
             viewer.show()
