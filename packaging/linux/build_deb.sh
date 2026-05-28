@@ -33,6 +33,6 @@ cp vantage-mail.desktop "$BUILD_DIR/usr/share/applications/"
 cp ../../"icons_Vantage Mail/Vantage trans_Logo.png" "$BUILD_DIR/usr/share/pixmaps/vantage-mail.png"
 
 # Build package
-dpkg-deb --build "$BUILD_DIR" vantage-mail_1.0.0_amd64.deb
+dpkg-deb --build "$BUILD_DIR" vantage-mail_1.0.1_amd64.deb
 
-echo "Debian package vantage-mail_1.0.0_amd64.deb built successfully!"
+echo "Debian package vantage-mail_1.0.1_amd64.deb built successfully!"

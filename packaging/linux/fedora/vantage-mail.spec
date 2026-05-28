@@ -1,5 +1,5 @@
 Name:           vantage-mail
-Version:        1.0.0
+Version:        1.0.1
 Release:        1%{?dist}
 Summary:        Vantage Mail Email Client
 
@@ -50,5 +50,8 @@ cp "icons_Vantage Mail/Vantage trans_Logo.png" %{buildroot}%{_datadir}/pixmaps/v
 %{_datadir}/pixmaps/vantage-mail.png
 
 %changelog
+* Wed May 27 2026 Developer <dev@example.com> - 1.0.1-1
+- Bugfix release for batch syncing, window lifetimes, and shortcut icons.
+
 * Tue May 26 2026 Developer <dev@example.com> - 1.0.0-1
 - Initial release of Vantage Mail desktop package.

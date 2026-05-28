@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vantage-mail"
-version = "1.0.0"
+version = "1.0.1"
 description = "Vantage Mail Email Client"
 authors = [
     {name = "Developer", email = "dev@example.com"}
