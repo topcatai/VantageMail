@@ -711,6 +711,7 @@ class MainWindow(QMainWindow):
     def _on_sync_progress(self, data):
         acc_email, folder_id, messages = data
         if self._current_folder_id == folder_id and self._current_account_email == acc_email:
+            self._populate_message_table(messages)
             self.statusBar().showMessage(f"Syncing folder: {folder_id} — {len(messages)} messages...")
 
     def _on_messages_loaded(self, data):
