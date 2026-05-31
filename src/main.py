@@ -29,6 +29,14 @@ def main():
 
     account_manager = AccountManager(db)
 
+    # Clean up orphaned Windows Credential Manager generic credentials if no accounts exist
+    if not account_manager.get_accounts():
+        try:
+            from services.token_storage import TokenStorage
+            TokenStorage().delete_token()
+        except Exception:
+            pass
+
     # ── Microsoft 365 block — uncomment when Azure is ready ──────────────
     # if not AZURE_CLIENT_ID or AZURE_CLIENT_ID == 'your-azure-client-id':
     #     raise ValueError("Set AZURE_CLIENT_ID in src/config.py before running")

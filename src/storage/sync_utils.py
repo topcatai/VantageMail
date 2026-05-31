@@ -51,17 +51,23 @@ def sync_folder_messages(provider, db, account_email: str, folder_id: str, limit
                     cached_dict[rid].get('sender') != rmsg['sender'] or 
                     cached_dict[rid].get('date') != rmsg['date']):
                     to_save.append(rmsg)
+                cached_dict[rid] = rmsg
             else:
                 # Insert new message
                 to_save.append(rmsg)
                 new_emails_count[0] += 1
+                cached_dict[rid] = rmsg
                 
         if to_save:
             db.batch_save_emails(account_email, folder_id, to_save)
             
         if progress_callback:
-            # Get latest state from DB and invoke callback
-            current_cached = db.get_cached_emails(account_email, folder_id)
+            # Use sorted in-memory cache state to avoid redundant SQLite queries
+            current_cached = sorted(
+                cached_dict.values(),
+                key=lambda m: m.get('date') or '',
+                reverse=True
+            )
             try:
                 progress_callback(current_cached)
             except Exception as cb_err:

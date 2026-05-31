@@ -153,6 +153,7 @@ class ImapProvider(MailProvider):
                 return 0
 
     def fetch_messages(self, folder_id, limit: int = None, search_term=None, chunk_callback=None, uid_callback=None):
+        latest_uids = []
         with self._lock:
             self._ensure_connected()
             try:
@@ -171,80 +172,90 @@ class ImapProvider(MailProvider):
                         uid_callback(latest_uids)
                     except Exception as cb_err:
                         log_error(f"Error in uid_callback: {cb_err}")
-
-                messages = []
-                if latest_uids:
-                    # Sync in blocks of 100, newest first.
-                    # since latest_uids is ascending, the newest UIDs are at the end.
-                    # We chunk from the end of the list.
-                    chunk_size = 100
-                    total_uids = len(latest_uids)
-                    for i in range(total_uids, 0, -chunk_size):
-                        chunk_start = max(0, i - chunk_size)
-                        chunk_uids = latest_uids[chunk_start:i]
-                        if not chunk_uids:
-                            continue
-                        
-                        data = self._imap.fetch(chunk_uids, ['ENVELOPE', 'FLAGS', 'BODYSTRUCTURE'])
-                        chunk_messages = []
-                        
-                        # Process in reverse order (newest first within chunk)
-                        for uid in reversed(chunk_uids):
-                            msg_data = data.get(uid)
-                            if not msg_data:
-                                continue
-                            env = msg_data.get(b'ENVELOPE')
-                            flags = msg_data.get(b'FLAGS', [])
-                            if not env:
-                                continue
-                            subject = ''
-                            sender = ''
-                            date = ''
-                            try:
-                                if env.subject:
-                                    raw_subj = env.subject
-                                    if isinstance(raw_subj, bytes):
-                                        raw_subj = raw_subj.decode('utf-8', errors='replace')
-                                    subject = str(make_header(decode_header(raw_subj)))
-                                else:
-                                    subject = ''
-                            except Exception:
-                                subject = str(env.subject) if env.subject else ''
-                            try:
-                                if env.from_:
-                                    mb = env.from_[0].mailbox
-                                    host = env.from_[0].host
-                                    mb = mb.decode('utf-8', errors='replace') if isinstance(mb, bytes) else str(mb)
-                                    host = host.decode('utf-8', errors='replace') if isinstance(host, bytes) else str(host)
-                                    sender = f"{mb}@{host}"
-                            except Exception:
-                                sender = ''
-                            try:
-                                date = env.date.isoformat() if env.date else ''
-                            except Exception:
-                                date = ''
-                            has_attachment = False
-                            bodystructure = msg_data.get(b'BODYSTRUCTURE')
-                            if bodystructure:
-                                has_attachment = _has_attachments_from_structure(bodystructure)
-                            chunk_messages.append({
-                                'id': uid,
-                                'subject': subject,
-                                'sender': sender,
-                                'date': date,
-                                'is_read': b'\\Seen' in flags,
-                                'has_attachment': has_attachment
-                            })
-                        
-                        messages.extend(chunk_messages)
-                        if chunk_callback:
-                            try:
-                                chunk_callback(chunk_messages)
-                            except Exception as cb_err:
-                                log_error(f"Error in chunk_callback: {cb_err}")
-                return messages
             except Exception as e:
                 raise ProviderError(f"fetch_messages failed: {e}")
+
+        messages = []
+        if latest_uids:
+            # Sync in blocks of 100, newest first.
+            # since latest_uids is ascending, the newest UIDs are at the end.
+            # We chunk from the end of the list.
+            chunk_size = 100
+            total_uids = len(latest_uids)
+            for i in range(total_uids, 0, -chunk_size):
+                chunk_start = max(0, i - chunk_size)
+                chunk_uids = latest_uids[chunk_start:i]
+                if not chunk_uids:
+                    continue
+                
+                data = None
+                with self._lock:
+                    self._ensure_connected()
+                    try:
+                        self._imap.select_folder(folder_id)
+                        data = self._imap.fetch(chunk_uids, ['ENVELOPE', 'FLAGS', 'BODYSTRUCTURE'])
+                    except Exception as e:
+                        raise ProviderError(f"fetch_messages chunk failed: {e}")
+                
+                if not data:
+                    continue
+
+                chunk_messages = []
+                # Process in reverse order (newest first within chunk)
+                for uid in reversed(chunk_uids):
+                    msg_data = data.get(uid)
+                    if not msg_data:
+                        continue
+                    env = msg_data.get(b'ENVELOPE')
+                    flags = msg_data.get(b'FLAGS', [])
+                    if not env:
+                        continue
+                    subject = ''
+                    sender = ''
+                    date = ''
+                    try:
+                        if env.subject:
+                            raw_subj = env.subject
+                            if isinstance(raw_subj, bytes):
+                                raw_subj = raw_subj.decode('utf-8', errors='replace')
+                            subject = str(make_header(decode_header(raw_subj)))
+                        else:
+                            subject = ''
+                    except Exception:
+                        subject = str(env.subject) if env.subject else ''
+                    try:
+                        if env.from_:
+                            mb = env.from_[0].mailbox
+                            host = env.from_[0].host
+                            mb = mb.decode('utf-8', errors='replace') if isinstance(mb, bytes) else str(mb)
+                            host = host.decode('utf-8', errors='replace') if isinstance(host, bytes) else str(host)
+                            sender = f"{mb}@{host}"
+                    except Exception:
+                        sender = ''
+                    try:
+                        date = env.date.isoformat() if env.date else ''
+                    except Exception:
+                        date = ''
+                    has_attachment = False
+                    bodystructure = msg_data.get(b'BODYSTRUCTURE')
+                    if bodystructure:
+                        has_attachment = _has_attachments_from_structure(bodystructure)
+                    chunk_messages.append({
+                        'id': uid,
+                        'subject': subject,
+                        'sender': sender,
+                        'date': date,
+                        'is_read': b'\\Seen' in flags,
+                        'has_attachment': has_attachment
+                    })
+                
+                messages.extend(chunk_messages)
+                if chunk_callback:
+                    try:
+                        chunk_callback(chunk_messages)
+                    except Exception as cb_err:
+                        log_error(f"Error in chunk_callback: {cb_err}")
+        return messages
 
     def fetch_message_body(self, message_id, folder_id=None):
         with self._lock:

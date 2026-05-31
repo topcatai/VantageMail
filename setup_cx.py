@@ -21,7 +21,8 @@ build_exe_options = {
         "imapclient",
         "smtplib",
         "msal",
-        "icalendar"
+        "icalendar",
+        "email"
     ],
     "includes": [
         "win32cred",
@@ -65,7 +66,46 @@ shortcut_table = [
     )
 ]
 
-msi_data = {"Shortcut": shortcut_table}
+# Directory hierarchy for AppData Local
+directory_table = [
+    ("LocalAppDataFolder", "TARGETDIR", "."),
+    ("VantageMailDataFolder", "LocalAppDataFolder", "VantageMail"),
+    ("VantageMailLogsFolder", "VantageMailDataFolder", "logs"),
+    ("VantageMailCacheFolder", "VantageMailDataFolder", "cache"),
+    ("VantageMailQtCacheFolder", "VantageMailCacheFolder", "qtpipelinecache-x86_64-little_endian-llp64")
+]
+
+# Remove registry keys under HKCU on uninstall
+remove_registry_table = [
+    ("VantageMailRegCleanup", 1, r"Software\TakshiqSoftLabs\VantageMail", "-", "TARGETDIR"),
+    ("VantageMailVendorRegCleanup", 1, r"Software\TakshiqSoftLabs", None, "TARGETDIR")
+]
+
+# Remove all database files and folders from AppData Local on uninstall
+remove_file_table = [
+    # 1. Clean files and folder for Qt Cache
+    ("CleanQtCacheFiles", "TARGETDIR", "*", "VantageMailQtCacheFolder", 2),
+    ("CleanQtCacheFolder", "TARGETDIR", None, "VantageMailQtCacheFolder", 2),
+
+    # 2. Clean files and folder for Cache root
+    ("CleanCacheFiles", "TARGETDIR", "*", "VantageMailCacheFolder", 2),
+    ("CleanCacheFolder", "TARGETDIR", None, "VantageMailCacheFolder", 2),
+
+    # 3. Clean files and folder for Logs
+    ("CleanLogsFiles", "TARGETDIR", "*", "VantageMailLogsFolder", 2),
+    ("CleanLogsFolder", "TARGETDIR", None, "VantageMailLogsFolder", 2),
+
+    # 4. Clean files and folder for VantageMail root (database, wal, shm)
+    ("CleanCachedFiles", "TARGETDIR", "*", "VantageMailDataFolder", 2),
+    ("CleanCachedFolder", "TARGETDIR", None, "VantageMailDataFolder", 2)
+]
+
+msi_data = {
+    "Shortcut": shortcut_table,
+    "Directory": directory_table,
+    "RemoveRegistry": remove_registry_table,
+    "RemoveFile": remove_file_table
+}
 
 bdist_msi_options = {
     "upgrade_code": "{8A5D6B2C-7C4E-4A9B-9B2D-2F3D4E5F6A7B}",

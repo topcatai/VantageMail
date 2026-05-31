@@ -205,6 +205,11 @@ class MainWindow(QMainWindow):
         icon_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "icons_Vantage Mail", "Vantage white_Logo.png"))
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
+        
+        # Cache paperclip icon existence to prevent disk access during table inserts
+        att_icon_path = "icons_Vantage Mail/paperclip.png"
+        self._paperclip_icon = QIcon(att_icon_path) if os.path.exists(att_icon_path) else None
+        
         self.resize(1280, 800)
         self._threads = []
         self._open_windows = []
@@ -706,7 +711,6 @@ class MainWindow(QMainWindow):
     def _on_sync_progress(self, data):
         acc_email, folder_id, messages = data
         if self._current_folder_id == folder_id and self._current_account_email == acc_email:
-            self._populate_message_table(messages)
             self.statusBar().showMessage(f"Syncing folder: {folder_id} — {len(messages)} messages...")
 
     def _on_messages_loaded(self, data):
@@ -747,6 +751,8 @@ class MainWindow(QMainWindow):
 
     def _populate_message_table(self, messages):
         self._stop_read_timer()
+        self.message_table.setUpdatesEnabled(False)
+        self.message_table.blockSignals(True)
         self.message_table.setSortingEnabled(False)
         self.message_table.setRowCount(0)
         for msg in messages:
@@ -754,14 +760,20 @@ class MainWindow(QMainWindow):
         self.message_table.setSortingEnabled(True)
         self.message_table.sortItems(3, Qt.SortOrder.DescendingOrder)
         self.message_table.horizontalHeader().setSortIndicator(3, Qt.SortOrder.DescendingOrder)
+        self.message_table.blockSignals(False)
+        self.message_table.setUpdatesEnabled(True)
 
     def _append_messages(self, messages):
+        self.message_table.setUpdatesEnabled(False)
+        self.message_table.blockSignals(True)
         self.message_table.setSortingEnabled(False)
         for msg in messages:
             self._insert_message_row(msg)
         self.message_table.setSortingEnabled(True)
         self.message_table.sortItems(3, Qt.SortOrder.DescendingOrder)
         self.message_table.horizontalHeader().setSortIndicator(3, Qt.SortOrder.DescendingOrder)
+        self.message_table.blockSignals(False)
+        self.message_table.setUpdatesEnabled(True)
         self.statusBar().showMessage(
             f"Loaded {self.message_table.rowCount()} emails (from cache) | Syncing...")
 
@@ -777,10 +789,8 @@ class MainWindow(QMainWindow):
         has_att = msg.get('has_attachment', False)
         att_item = QTableWidgetItem()
         if has_att:
-            import os
-            icon_path = "icons_Vantage Mail/paperclip.png"
-            if os.path.exists(icon_path):
-                att_item.setIcon(QIcon(icon_path))
+            if self._paperclip_icon:
+                att_item.setIcon(self._paperclip_icon)
             else:
                 att_item.setText("📎")
         att_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1379,7 +1389,7 @@ class MainWindow(QMainWindow):
             return
         db = self.account_manager._db
         cached = db.get_cached_emails(self._current_account_email, self._current_folder_id)
-        self._on_messages_loaded(cached)
+        self._on_messages_loaded((self._current_account_email, self._current_folder_id, cached))
 
     def _toggle_layout(self, checked: bool):
         if checked:
@@ -1575,12 +1585,12 @@ class MainWindow(QMainWindow):
 
     def _apply_refresh_interval(self):
         settings = QSettings("TakshiqSoftLabs", "VantageMail")
-        interval_str = settings.value("sync/interval", "10 s", type=str)
+        interval_str = settings.value("sync/interval", "1 min", type=str)
         if interval_str == "Manual":
             self._refresh_timer.stop()
             return
         
-        secs = 10
+        secs = 60
         try:
             parts = interval_str.split()
             if len(parts) == 2:

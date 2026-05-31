@@ -39,19 +39,31 @@ class Database:
             cursor.execute("SELECT account_email FROM emails LIMIT 1")
         except sqlite3.OperationalError:
             cursor.execute("DROP TABLE IF EXISTS emails")
-        # Create emails table with compound primary key
+        # Create emails table with compound primary key and date column
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS emails (
                 id TEXT,
                 account_email TEXT,
                 folder_id TEXT,
                 data TEXT,
+                date TEXT,
                 synced_at TEXT,
                 PRIMARY KEY (account_email, folder_id, id)
             )
         """)
-        # index for performance
+        # Schema migration: check if date column exists, if not alter table and populate
+        try:
+            cursor.execute("PRAGMA table_info(emails)")
+            cols = [col[1] for col in cursor.fetchall()]
+            if cols and "date" not in cols:
+                cursor.execute("ALTER TABLE emails ADD COLUMN date TEXT")
+                cursor.execute("UPDATE emails SET date = json_extract(data, '$.date')")
+        except Exception as e_col:
+            from utils.logger import log_error
+            log_error(f"Failed to migrate emails table schema: {e_col}")
+        # indexes for performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_emails_account_folder ON emails(account_email, folder_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_emails_acc_fld_date ON emails(account_email, folder_id, date)")
         # accounts table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS accounts (
@@ -153,12 +165,12 @@ class Database:
         cursor = self.conn.cursor()
         if limit is not None:
             cursor.execute(
-                "SELECT data FROM emails WHERE account_email = ? AND folder_id = ? ORDER BY json_extract(data, '$.date') DESC LIMIT ?",
+                "SELECT data FROM emails WHERE account_email = ? AND folder_id = ? ORDER BY date DESC LIMIT ?",
                 (account_email, folder_id, limit)
             )
         else:
             cursor.execute(
-                "SELECT data FROM emails WHERE account_email = ? AND folder_id = ? ORDER BY json_extract(data, '$.date') DESC",
+                "SELECT data FROM emails WHERE account_email = ? AND folder_id = ? ORDER BY date DESC",
                 (account_email, folder_id)
             )
         rows = cursor.fetchall()
@@ -175,10 +187,11 @@ class Database:
 
     def save_cached_email(self, account_email: str, folder_id: str, email_id: str, data_dict: Dict):
         cursor = self.conn.cursor()
+        date_val = data_dict.get('date')
         cursor.execute("""
-            INSERT OR REPLACE INTO emails (id, account_email, folder_id, data, synced_at)
-            VALUES (?, ?, ?, ?, datetime('now'))
-        """, (str(email_id), account_email, folder_id, json.dumps(data_dict)))
+            INSERT OR REPLACE INTO emails (id, account_email, folder_id, data, date, synced_at)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+        """, (str(email_id), account_email, folder_id, json.dumps(data_dict), date_val))
         
         if self.fts_available:
             cursor.execute(
@@ -201,10 +214,11 @@ class Database:
         cursor = self.conn.cursor()
         with self.conn:  # single transaction = single commit
             for msg in msgs:
+                date_val = msg.get('date')
                 cursor.execute(
-                    "INSERT OR REPLACE INTO emails (id, account_email, folder_id, data, synced_at)"
-                    " VALUES (?, ?, ?, ?, datetime('now'))",
-                    (str(msg['id']), account_email, folder_id, json.dumps(msg))
+                    "INSERT OR REPLACE INTO emails (id, account_email, folder_id, data, date, synced_at)"
+                    " VALUES (?, ?, ?, ?, ?, datetime('now'))",
+                    (str(msg['id']), account_email, folder_id, json.dumps(msg), date_val)
                 )
                 if self.fts_available:
                     cursor.execute(

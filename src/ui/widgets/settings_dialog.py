@@ -62,7 +62,7 @@ class SettingsDialog(QDialog):
         # ── SECTION 2: Email Sync ─────────────────────────────────────────
         self.sync_interval_combo = QComboBox()
         self.sync_interval_combo.addItems(["10 s", "30 s", "1 min", "5 min", "10 min", "Manual"])
-        self.sync_interval_combo.setCurrentText(self.settings.value("sync/interval", "10 s", type=str))
+        self.sync_interval_combo.setCurrentText(self.settings.value("sync/interval", "1 min", type=str))
 
         self.sync_limit_combo = QComboBox()
         self.sync_limit_combo.addItems(["100", "200", "500", "All"])
